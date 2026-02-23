@@ -2,7 +2,7 @@ import { Link, useLocation } from "react-router-dom";
 
 const navItems = [
   { path: "/", label: "Приколы", icon: "📒" },
-  { path: "/feed", label: "Лента", icon: "📰" },
+  { path: "/feed", label: "Лента 🌻", icon: "📰" },
   { path: "/friends", label: "Друзья", icon: "👋" },
 ] as const;
 

@@ -23,6 +23,16 @@ function headersMultipart(init?: HeadersInit): Headers {
   return h;
 }
 
+/** Auth only, no Content-Type — for GET/DELETE without body */
+function headersNoBody(init?: HeadersInit): Headers {
+  const h = new Headers(init);
+  const initData = getInitData();
+  if (initData) {
+    h.set("x-telegram-init-data", initData);
+  }
+  return h;
+}
+
 const base = () => API_BASE.replace(/\/$/, "");
 
 function parseJsonOrThrow<T>(res: Response): Promise<T> {
@@ -39,13 +49,25 @@ function parseJsonOrThrow<T>(res: Response): Promise<T> {
   });
 }
 
+function parseErrorResponse(res: Response, text: string): string {
+  if (text) {
+    try {
+      const data = JSON.parse(text) as { error?: string };
+      if (typeof data?.error === "string") return data.error;
+    } catch {
+      /* ignore */
+    }
+  }
+  return res.statusText || "Request failed";
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${base()}${path}`, {
-    headers: headers(),
+    headers: headersNoBody(),
   });
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as { error?: string }).error ?? "Request failed");
+    const text = await res.text();
+    throw new Error(parseErrorResponse(res, text));
   }
   return parseJsonOrThrow<T>(res);
 }
@@ -86,6 +108,17 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
     throw new Error((err as { error?: string }).error ?? "Request failed");
   }
   return parseJsonOrThrow<T>(res);
+}
+
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`${base()}${path}`, {
+    method: "DELETE",
+    headers: headersNoBody(),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(parseErrorResponse(res, text));
+  }
 }
 
 export async function apiPostFormData<T>(path: string, formData: FormData): Promise<T> {

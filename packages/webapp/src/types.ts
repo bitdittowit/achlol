@@ -23,9 +23,15 @@ export interface Prank {
   completedAt: string | null;
   completionStoryText: string | null;
   witnessUserId?: number | null;
+  /** Present when witness was set; for display in confirmation flow */
+  witness?: { id: number; firstName: string | null; lastName: string | null; username: string | null };
   confirmedAt?: string | null;
+  witnessRejectedAt?: string | null;
   confirmed?: boolean;
+  witnessRejected?: boolean;
   isOwner?: boolean;
+  /** True if current user is the witness (can confirm/reject) */
+  isWitness?: boolean;
   createdAt: string;
   updatedAt: string;
   media: Media[];

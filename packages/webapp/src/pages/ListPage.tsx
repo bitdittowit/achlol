@@ -9,6 +9,7 @@ export function ListPage() {
   const [pranks, setPranks] = useState<Prank[]>([]);
   const [activeCount, setActiveCount] = useState<number | null>(null);
   const [participantsQuery, setParticipantsQuery] = useState("");
+  const [confirmedOnly, setConfirmedOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,12 +20,13 @@ export function ListPage() {
     if (participantsQuery.trim() && tab === "completed") {
       params.set("participantsQuery", participantsQuery.trim());
     }
+    if (tab === "completed" && confirmedOnly) params.set("confirmedOnly", "true");
     const query = params.toString();
     apiGet<Prank[]>(`/api/pranks${query ? `?${query}` : ""}`)
       .then(setPranks)
       .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"))
       .finally(() => setLoading(false));
-  }, [tab, participantsQuery]);
+  }, [tab, participantsQuery, confirmedOnly]);
 
   useEffect(() => {
     if (tab === "planned") {
@@ -71,11 +73,11 @@ export function ListPage() {
 
       {tab === "planned" && activeCount !== null && (
         <p className="text-sm text-[var(--color-text-muted)] mb-3">
-          Активных: {activeCount} / 30
+          Запланированных: {activeCount} / 30
         </p>
       )}
       {tab === "completed" && (
-        <div className="mb-4">
+        <div className="mb-4 space-y-3">
           <input
             type="search"
             value={participantsQuery}
@@ -84,6 +86,19 @@ export function ListPage() {
             className="input-field"
             aria-label="Поиск по участникам"
           />
+          <button
+            type="button"
+            onClick={() => setConfirmedOnly((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition ${
+              confirmedOnly
+                ? "bg-[var(--color-accent)] text-white"
+                : "bg-[var(--color-border)] text-[var(--color-text-secondary)]"
+            }`}
+            aria-pressed={confirmedOnly}
+          >
+            <span aria-hidden>✓</span>
+            Только подтверждённые
+          </button>
         </div>
       )}
 
@@ -133,7 +148,22 @@ export function ListPage() {
                     {p.confirmed && (
                       <>
                         <span>·</span>
-                        <span className="text-[var(--color-accent)]">✓ Подтверждён</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-xs font-medium text-[var(--color-accent)]">
+                          <span aria-hidden>✓</span>
+                          Подтверждён
+                        </span>
+                      </>
+                    )}
+                    {p.witnessRejected && !p.confirmed && (
+                      <>
+                        <span>·</span>
+                        <span className="text-[var(--color-text-muted)] text-xs">Свидетель отклонил</span>
+                      </>
+                    )}
+                    {p.witnessUserId != null && !p.confirmed && !p.witnessRejected && (
+                      <>
+                        <span>·</span>
+                        <span className="text-[var(--color-text-muted)] text-xs">Ожидает подтверждения</span>
                       </>
                     )}
                   </div>

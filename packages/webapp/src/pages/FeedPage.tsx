@@ -35,7 +35,7 @@ export function FeedPage() {
   return (
     <div className="px-4 pt-2">
       <div className="mb-4">
-        <h1 className="text-xl font-semibold text-[var(--color-text)]">Лента</h1>
+        <h1 className="text-xl font-semibold text-[var(--color-text)]">Лента 🌻</h1>
         <p className="text-sm text-[var(--color-text-muted)] mt-0.5">Новые приколы ваших друзей</p>
       </div>
 
@@ -79,7 +79,10 @@ export function FeedPage() {
                     {p.confirmed && (
                       <>
                         <span>·</span>
-                        <span className="text-[var(--color-accent)]">✓ Подтверждён</span>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-xs font-medium text-[var(--color-accent)]">
+                          <span aria-hidden>✓</span>
+                          Подтверждён
+                        </span>
                       </>
                     )}
                   </div>

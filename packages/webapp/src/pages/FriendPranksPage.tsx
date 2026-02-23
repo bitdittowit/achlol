@@ -94,7 +94,10 @@ export function FriendPranksPage() {
                       {p.confirmed && (
                         <>
                           <span>·</span>
-                          <span className="text-[var(--color-accent)]">✓ Подтверждён</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-accent)]/15 px-1.5 py-0.5 text-xs font-medium text-[var(--color-accent)]">
+                            <span aria-hidden>✓</span>
+                            Подтверждён
+                          </span>
                         </>
                       )}
                     </div>

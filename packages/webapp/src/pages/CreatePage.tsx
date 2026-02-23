@@ -22,10 +22,20 @@ export function CreatePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const friendName = (f: Friend) => [f.firstName, f.lastName].filter(Boolean).join(" ") || f.username || `#${f.id}`;
+  /** Имя для отображения; при наличии username — @username в скобках; при дубликатах имён — добавляем #id */
+  const friendDisplayName = (f: Friend) => {
+    const namePart = [f.firstName, f.lastName].filter(Boolean).join(" ").trim() || f.username || "";
+    const base = namePart ? (f.username ? `${namePart} (@${f.username})` : namePart) : `#${f.id}`;
+    if (base.startsWith("#")) return base;
+    const sameNameCount = friends.filter(
+      (x) => [x.firstName, x.lastName].filter(Boolean).join(" ").trim() === [f.firstName, f.lastName].filter(Boolean).join(" ").trim() && !x.username
+    ).length;
+    const needId = !f.username && sameNameCount > 1;
+    return needId ? `${base} (#${f.id})` : base;
+  };
   const participantsString = [
     ...(includeMe ? ["Я"] : []),
-    ...selectedParticipantIds.map((id) => friends.find((x) => x.id === id)).filter(Boolean).map((f) => friendName(f!)),
+    ...selectedParticipantIds.map((id) => friends.find((x) => x.id === id)).filter(Boolean).map((f) => friendDisplayName(f!)),
     ...participantsExtra.split(",").map((s) => s.trim()).filter(Boolean),
   ].join(", ") || "";
   const hasParticipants = includeMe || selectedParticipantIds.length > 0 || participantsExtra.trim().length > 0;
@@ -145,7 +155,7 @@ export function CreatePage() {
                           : "bg-[var(--color-surface)] text-[var(--color-text)] border-[var(--color-border)]"
                       }`}
                     >
-                      {friendName(f)}
+                      {friendDisplayName(f)}
                     </button>
                   );
                 })}
@@ -170,6 +180,9 @@ export function CreatePage() {
             <label htmlFor="create-witness" className="block text-sm font-medium text-[var(--color-text-secondary)] mb-1.5">
               Свидетель (друг)
             </label>
+            <p className="text-xs text-[var(--color-text-muted)] mb-2">
+              Если выберете друга, он получит запрос в боте и в приложении и сможет подтвердить, что прикол был. Подтверждённые приколы отмечены галочкой ✓.
+            </p>
             {friends.length === 0 ? (
               <p className="text-sm text-[var(--color-text-muted)] py-2">
                 Добавьте друзей в разделе «Друзья», чтобы выбрать свидетеля.
@@ -184,7 +197,7 @@ export function CreatePage() {
                 <option value="">Не выбирать</option>
                 {friends.map((f) => (
                   <option key={f.id} value={f.id}>
-                    {[f.firstName, f.lastName].filter(Boolean).join(" ") || f.username || `#${f.id}`}
+                    {friendDisplayName(f)}
                   </option>
                 ))}
               </select>
