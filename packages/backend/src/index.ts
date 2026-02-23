@@ -6,6 +6,8 @@ import { ensureUploadsDir } from "./lib/storage.js";
 import { usersRoutes } from "./routes/users.js";
 import { pranksRoutes } from "./routes/pranks.js";
 import { filesRoutes } from "./routes/files.js";
+import { friendsRoutes } from "./routes/friends.js";
+import { internalRoutes } from "./routes/internal.js";
 
 const app = Fastify({ logger: true });
 
@@ -22,6 +24,8 @@ app.get("/health", async () => ({ ok: true }));
 await app.register(usersRoutes);
 await app.register(pranksRoutes);
 await app.register(filesRoutes);
+await app.register(friendsRoutes);
+await app.register(internalRoutes);
 
 await ensureUploadsDir();
 

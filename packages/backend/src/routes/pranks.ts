@@ -13,9 +13,28 @@ export async function pranksRoutes(app: FastifyInstance) {
   app.get("/api/pranks", async (request, reply) => {
     if (!request.user) return reply.status(401).send({ error: "Unauthorized" });
     const parsed = prankListQuerySchema.safeParse(request.query);
-    const status = parsed.success ? parsed.data.status : undefined;
-    const list = await prankService.listPranks(request.user.id, status);
-    return reply.send(list);
+    const query = parsed.success ? parsed.data : undefined;
+    const list = await prankService.listPranks(request.user.id, query);
+    return reply.send(list.map((p) => ({ ...p, confirmed: !!p.confirmedAt })));
+  });
+
+  app.get("/api/pranks/active-count", async (request, reply) => {
+    if (!request.user) return reply.status(401).send({ error: "Unauthorized" });
+    const count = await prankService.countActivePranks(request.user.id);
+    return reply.send({ count });
+  });
+
+  app.get("/api/feed", async (request, reply) => {
+    if (!request.user) return reply.status(401).send({ error: "Unauthorized" });
+    const list = await prankService.getFeedPranks(request.user.id);
+    return reply.send(
+      list.map((p) => ({
+        ...p,
+        author: p.user,
+        confirmed: !!p.confirmedAt,
+        user: undefined,
+      }))
+    );
   });
 
   app.post("/api/pranks", async (request, reply) => {
@@ -51,9 +70,9 @@ export async function pranksRoutes(app: FastifyInstance) {
         title: fields.title,
         description: fields.description ?? null,
         iconType: fields.iconType ?? "auto",
-        fromField: fields.fromField,
-        toField: fields.toField,
+        participants: fields.participants,
         scheduledAt: fields.scheduledAt || null,
+        witnessUserId: fields.witnessUserId ? Number(fields.witnessUserId) : null,
       };
     } else {
       body = (await request.body) as Record<string, unknown>;
@@ -63,22 +82,41 @@ export async function pranksRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.status(400).send({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const prank = await prankService.createPrank(
-      request.user.id,
-      parsed.data,
-      iconPath,
-      mediaPath
-    );
-    return reply.status(201).send(prank);
+    try {
+      const prank = await prankService.createPrank(
+        request.user.id,
+        parsed.data,
+        iconPath,
+        mediaPath
+      );
+      if (!prank) return reply.status(500).send({ error: "Failed to create prank" });
+      return reply.status(201).send({ ...prank, confirmed: !!prank.confirmedAt });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Limit exceeded";
+      if (message.includes("лимит")) {
+        return reply.status(403).send({ error: message });
+      }
+      throw err;
+    }
   });
 
   app.get("/api/pranks/:id", async (request, reply) => {
     if (!request.user) return reply.status(401).send({ error: "Unauthorized" });
     const id = Number((request.params as { id: string }).id);
     if (Number.isNaN(id)) return reply.status(400).send({ error: "Invalid id" });
-    const prank = await prankService.getPrankById(id, request.user.id);
+    const prank = await prankService.getPrankByIdForViewer(id, request.user.id);
     if (!prank) return reply.status(404).send({ error: "Not found" });
-    return reply.send(prank);
+    const isOwner = prank.userId === request.user.id;
+    return reply.send({ ...prank, confirmed: !!prank.confirmedAt, isOwner });
+  });
+
+  app.post("/api/pranks/:id/confirm", async (request, reply) => {
+    if (!request.user) return reply.status(401).send({ error: "Unauthorized" });
+    const id = Number((request.params as { id: string }).id);
+    if (Number.isNaN(id)) return reply.status(400).send({ error: "Invalid id" });
+    const prank = await prankService.confirmPrankByWitness(id, request.user.id);
+    if (!prank) return reply.status(404).send({ error: "Not found" });
+    return reply.send({ ...prank, confirmed: true });
   });
 
   app.patch("/api/pranks/:id", async (request, reply) => {
@@ -89,9 +127,15 @@ export async function pranksRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.status(400).send({ error: "Validation failed", details: parsed.error.flatten() });
     }
-    const prank = await prankService.updatePrank(id, request.user.id, parsed.data);
-    if (!prank) return reply.status(404).send({ error: "Not found" });
-    return reply.send(prank);
+    try {
+      const prank = await prankService.updatePrank(id, request.user.id, parsed.data);
+      if (!prank) return reply.status(404).send({ error: "Not found" });
+      return reply.send({ ...prank, confirmed: !!prank.confirmedAt });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.includes("друг")) return reply.status(400).send({ error: msg });
+      throw err;
+    }
   });
 
   app.post("/api/pranks/:id/icon", async (request, reply) => {
