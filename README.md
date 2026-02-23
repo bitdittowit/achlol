@@ -59,16 +59,21 @@ npm run dev
 - `npm run dev:bot` — Telegram-бот
 - `npm run dev:webapp` — Mini App на http://localhost:5173
 
-Для проверки Mini App в Telegram нужен HTTPS. Варианты:
+Для проверки Mini App в Telegram нужен HTTPS. При открытии из Telegram запросы к API идут с телефона, поэтому **бэкенд тоже должен быть доступен по HTTPS** (не localhost).
 
-- Раздать webapp через [ngrok](https://ngrok.com): `ngrok http 5173`, подставить полученный URL в `MINI_APP_URL` и в настройках бота (Menu Button / Web App URL).
-- Либо раздать статику с того же домена, что и API, и открывать по HTTPS.
+**Два туннеля (рекомендуется для разработки):**
 
-При локальной разработке webapp и бэкенд работают на разных портах, поэтому нужно указать URL бэкенда:
+1. **Туннель для webapp** (порт 5173) — в него заходит пользователь из Telegram.
+   - Пример: `npx localtunnel --port 5173` или `cloudflared tunnel --url http://localhost:5173`.
+   - URL туннеля → в корневой `.env`: `MINI_APP_URL=https://...` и в настройках бота (Menu Button / Web App URL).
 
-1. Скопируйте `packages/webapp/.env.example` в `packages/webapp/.env`.
-2. Убедитесь, что в `.env` задано: `VITE_API_URL=http://localhost:3000`.
-3. Перезапустите `npm run dev:webapp` после изменения `.env`.
+2. **Туннель для бэкенда** (порт 3000) — по нему webapp ходит в API.
+   - Пример: `cloudflared tunnel --url http://localhost:3000`.
+   - URL туннеля → в **корневой** `.env`: `VITE_API_URL=https://...` (без слэша в конце).
+
+Без `VITE_API_URL` запросы уходят на тот же хост, что и Mini App (туннель webapp), API там нет → 404 и ошибка «Сервер не найден». Пользователь в БД не создаётся, т.к. бэкенд запрос не получает.
+
+**Локально в браузере (без Telegram):** в корневом `.env` укажите `VITE_API_URL=http://localhost:3000`. Перезапустите webapp после изменения.
 
 ## Скрипты
 

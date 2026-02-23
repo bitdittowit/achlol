@@ -14,6 +14,9 @@ await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
 
 app.addHook("preHandler", authMiddleware);
 
+app.get("/", async (_, reply) => {
+  reply.redirect("/health", 302);
+});
 app.get("/health", async () => ({ ok: true }));
 
 await app.register(usersRoutes);

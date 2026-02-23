@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "dotenv -e ../../.env -- tsx watch src/index.ts",
     "build": "tsc && cp -r src/__generated__ dist/",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "db:push": "prisma db push"
   },
   "dependencies": {
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "dotenv-cli": "^7.4.2",
     "prisma": "^5.22.0",
     "tsx": "^4.19.2",
     "typescript": "~5.6.0"

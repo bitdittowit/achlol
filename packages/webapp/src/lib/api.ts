@@ -25,6 +25,20 @@ function headersMultipart(init?: HeadersInit): Headers {
 
 const base = () => API_BASE.replace(/\/$/, "");
 
+function parseJsonOrThrow<T>(res: Response): Promise<T> {
+  return res.text().then((text) => {
+    try {
+      return (text ? JSON.parse(text) : null) as T;
+    } catch {
+      throw new Error(
+        res.status === 404
+          ? "Сервер не найден. В корневом .env задайте VITE_API_URL=URL туннеля на бэкенд (порт 3000), перезапустите webapp."
+          : "Сервер вернул неверный ответ. Задайте VITE_API_URL в корневом .env (URL туннеля на бэкенд) и перезапустите webapp."
+      );
+    }
+  });
+}
+
 export async function apiGet<T>(path: string): Promise<T> {
   const res = await fetch(`${base()}${path}`, {
     headers: headers(),
@@ -33,7 +47,7 @@ export async function apiGet<T>(path: string): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error?: string }).error ?? "Request failed");
   }
-  return res.json() as Promise<T>;
+  return parseJsonOrThrow<T>(res);
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -46,7 +60,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error?: string }).error ?? "Request failed");
   }
-  return res.json() as Promise<T>;
+  return parseJsonOrThrow<T>(res);
 }
 
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
@@ -59,7 +73,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error?: string }).error ?? "Request failed");
   }
-  return res.json() as Promise<T>;
+  return parseJsonOrThrow<T>(res);
 }
 
 export async function apiPostFormData<T>(path: string, formData: FormData): Promise<T> {
@@ -74,7 +88,7 @@ export async function apiPostFormData<T>(path: string, formData: FormData): Prom
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((err as { error?: string }).error ?? "Request failed");
   }
-  return res.json() as Promise<T>;
+  return parseJsonOrThrow<T>(res);
 }
 
 /** Returns URL for fetching file with auth (use in fetch, not in img src) */
