@@ -1,0 +1,22 @@
+{
+  "name": "prankster",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:bot\" \"npm run dev:webapp\"",
+    "dev:backend": "npm run dev -w backend",
+    "dev:bot": "npm run dev -w bot",
+    "dev:webapp": "npm run dev -w webapp",
+    "build": "npm run build -w @prankster/shared && npm run build -w backend && npm run build -w webapp",
+    "db:generate": "npm run db:generate -w backend",
+    "db:migrate": "npm run db:migrate -w backend",
+    "db:push": "npm run db:push -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1",
+    "typescript": "~5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

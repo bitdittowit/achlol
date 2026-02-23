@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/__generated__/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  telegramId String   @unique @map("telegram_id")
+  username   String?  @map("username")
+  firstName  String?  @map("first_name")
+  lastName   String?  @map("last_name")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  pranks Prank[]
+
+  @@map("users")
+}
+
+model Prank {
+  id                  Int       @id @default(autoincrement())
+  userId              Int       @map("user_id")
+  title               String
+  description         String?   @db.Text
+  iconType            String    @map("icon_type") // auto | prompt | upload
+  iconPath            String?   @map("icon_path")
+  fromField           String    @map("from_field")
+  toField             String   @map("to_field")
+  status              String    // planned | completed
+  scheduledAt         DateTime? @map("scheduled_at") @db.Timestamptz
+  completedAt         DateTime? @map("completed_at") @db.Timestamptz
+  completionStoryText String?   @map("completion_story_text") @db.Text
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media Media[]
+
+  @@map("pranks")
+}
+
+model Media {
+  id        Int      @id @default(autoincrement())
+  prankId   Int      @map("prank_id")
+  type      String   // photo | video
+  filePath  String   @map("file_path")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  prank Prank @relation(fields: [prankId], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}

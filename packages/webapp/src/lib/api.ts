@@ -1,0 +1,94 @@
+const API_BASE = import.meta.env.VITE_API_URL ?? "";
+
+function getInitData(): string {
+  return window.Telegram?.WebApp?.initData ?? "";
+}
+
+function headers(init?: HeadersInit): Headers {
+  const h = new Headers(init);
+  const initData = getInitData();
+  if (initData) {
+    h.set("x-telegram-init-data", initData);
+  }
+  h.set("Content-Type", "application/json");
+  return h;
+}
+
+function headersMultipart(init?: HeadersInit): Headers {
+  const h = new Headers(init);
+  const initData = getInitData();
+  if (initData) {
+    h.set("x-telegram-init-data", initData);
+  }
+  return h;
+}
+
+const base = () => API_BASE.replace(/\/$/, "");
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${base()}${path}`, {
+    headers: headers(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? "Request failed");
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${base()}${path}`, {
+    method: "POST",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? "Request failed");
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${base()}${path}`, {
+    method: "PATCH",
+    headers: headers(),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? "Request failed");
+  }
+  return res.json() as Promise<T>;
+}
+
+export async function apiPostFormData<T>(path: string, formData: FormData): Promise<T> {
+  const h = headersMultipart();
+  h.delete("Content-Type");
+  const res = await fetch(`${base()}${path}`, {
+    method: "POST",
+    headers: h,
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? "Request failed");
+  }
+  return res.json() as Promise<T>;
+}
+
+/** Returns URL for fetching file with auth (use in fetch, not in img src) */
+export function fileApiPath(path: string): string {
+  return `${base()}/api/files/${path}`;
+}
+
+/** Fetch image with auth and return blob URL for use in img src */
+export async function fetchImageBlobUrl(path: string): Promise<string> {
+  const initData = getInitData();
+  const res = await fetch(fileApiPath(path), {
+    headers: initData ? { "x-telegram-init-data": initData } : {},
+  });
+  if (!res.ok) throw new Error("Failed to load image");
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
