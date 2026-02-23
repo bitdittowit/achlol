@@ -40,6 +40,7 @@ model Prank {
   completionStoryText String?   @map("completion_story_text") @db.Text
   witnessUserId       Int?      @map("witness_user_id")
   confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz
+  witnessRejectedAt   DateTime? @map("witness_rejected_at") @db.Timestamptz
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 

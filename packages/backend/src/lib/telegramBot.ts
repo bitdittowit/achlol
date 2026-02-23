@@ -7,12 +7,13 @@ export interface InlineButton {
 }
 
 export async function sendMessage(
-  chatId: string,
+  chatId: string | number,
   text: string,
   inlineKeyboard?: InlineButton[][]
 ): Promise<boolean> {
   if (!API) return false;
-  const body: Record<string, unknown> = { chat_id: chatId, text, parse_mode: "HTML" };
+  const numericId = typeof chatId === "string" && /^\d+$/.test(chatId) ? Number(chatId) : chatId;
+  const body: Record<string, unknown> = { chat_id: numericId, text };
   if (inlineKeyboard?.length) {
     body.reply_markup = { inline_keyboard: inlineKeyboard };
   }
@@ -21,6 +22,10 @@ export async function sendMessage(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[telegramBot] sendMessage failed:", res.status, err);
+  }
   return res.ok;
 }
 

@@ -39,6 +39,30 @@ export async function handlePrankConfirmCallback(ctx: Context) {
       return;
     }
   }
+  if (action === "reject" && BOT_SECRET) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/internal/prank-reject`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Bot-Secret": BOT_SECRET,
+        },
+        body: JSON.stringify({ prankId, telegramId }),
+      });
+      if (!res.ok) {
+        await ctx.answerCbQuery("Ошибка").catch(() => {});
+        return;
+      }
+      await ctx.answerCbQuery();
+      if ("message" in cb && cb.message && "message_id" in cb.message) {
+        await ctx.editMessageText("Отклонено.").catch(() => {});
+      }
+      return;
+    } catch {
+      await ctx.answerCbQuery("Ошибка").catch(() => {});
+      return;
+    }
+  }
   await ctx.answerCbQuery();
   if ("message" in cb && cb.message && "message_id" in cb.message) {
     await ctx.editMessageText(action === "reject" ? "Отклонено." : "Подтверждено.").catch(() => {});

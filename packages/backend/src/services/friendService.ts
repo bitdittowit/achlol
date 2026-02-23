@@ -109,11 +109,18 @@ export async function getOutgoingRequests(userId: number) {
 export async function cancelRequest(requestId: number, userId: number) {
   const req = await prisma.friendRequest.findFirst({
     where: { id: requestId, fromUserId: userId, status: "pending" },
-    include: { fromUser: { select: { firstName: true, lastName: true } }, toUser: { select: { telegramId: true } } },
+    include: {
+      fromUser: { select: { firstName: true, lastName: true, telegramId: true } },
+      toUser: { select: { telegramId: true, username: true, firstName: true, lastName: true } },
+    },
   });
   if (!req) return null;
   await prisma.friendRequest.update({ where: { id: requestId }, data: { status: "cancelled" } });
   const fromName = [req.fromUser.firstName, req.fromUser.lastName].filter(Boolean).join(" ") || "Кто-то";
+  const toDisplay = req.toUser.username ? `@${req.toUser.username}` : [req.toUser.firstName, req.toUser.lastName].filter(Boolean).join(" ") || "пользователю";
+  if (req.fromUser.telegramId) {
+    await sendMessage(req.fromUser.telegramId, `Вы отменили заявку в друзья для ${toDisplay}.`);
+  }
   if (req.toUser.telegramId) {
     await sendMessage(req.toUser.telegramId, `${fromName} отменил(а) заявку в друзья.`);
   }

@@ -1,6 +1,6 @@
-import path from "node:path";
 import sharp from "sharp";
-import { iconRelativePath, uniqueFilename, fullPath } from "../lib/storage.js";
+import { getStorageAdapter } from "../lib/adapters/index.js";
+import { iconRelativePath, uniqueFilename } from "../lib/storage.js";
 
 const SIZE = 128;
 
@@ -27,13 +27,16 @@ export async function generateIconFromTitle(title: string): Promise<string> {
   const hex = `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
   const textColor = (r * 0.299 + g * 0.587 + b * 0.114) > 140 ? "#1a1a1a" : "#ffffff";
 
+  const cx = SIZE / 2;
+  const cy = SIZE / 2;
+  /* dy: librsvg often ignores dominant-baseline; shift baseline down so capital letter is visually centered */
   const svg = `
-<svg width="${SIZE}" height="${SIZE}" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="${SIZE / 2}" cy="${SIZE / 2}" r="${SIZE / 2}" fill="${hex}"/>
+<svg width="${SIZE}" height="${SIZE}" viewBox="0 0 ${SIZE} ${SIZE}" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="${cx}" cy="${cy}" r="${cx}" fill="${hex}"/>
   <text
-    x="50%"
-    y="50%"
-    dominant-baseline="central"
+    x="${cx}"
+    y="${cy}"
+    dy="0.4em"
     text-anchor="middle"
     font-family="Arial, sans-serif"
     font-size="56"
@@ -44,13 +47,11 @@ export async function generateIconFromTitle(title: string): Promise<string> {
 
   const filename = uniqueFilename(".png");
   const relativePath = iconRelativePath(filename);
-  const outputPath = fullPath(relativePath);
-
-  await sharp(Buffer.from(svg))
+  const buffer = await sharp(Buffer.from(svg))
     .resize(SIZE, SIZE)
     .png()
-    .toFile(outputPath);
-
+    .toBuffer();
+  await getStorageAdapter().upload(relativePath, buffer, "image/png");
   return relativePath;
 }
 
@@ -70,7 +71,6 @@ export async function processUploadedIcon(buffer: Buffer, mime: string): Promise
   const ext = mime === "image/png" ? ".png" : ".jpg";
   const filename = uniqueFilename(ext);
   const relativePath = iconRelativePath(filename);
-  const outputPath = fullPath(relativePath);
 
   const half = SIZE / 2;
   const circleSvg = `
@@ -78,11 +78,11 @@ export async function processUploadedIcon(buffer: Buffer, mime: string): Promise
   <circle cx="${half}" cy="${half}" r="${half}" fill="black"/>
 </svg>`;
 
-  await sharp(buffer)
+  const outBuffer = await sharp(buffer)
     .resize(SIZE, SIZE)
     .composite([{ input: Buffer.from(circleSvg), blend: "dest-in" }])
     .png()
-    .toFile(outputPath);
-
+    .toBuffer();
+  await getStorageAdapter().upload(relativePath, outBuffer, "image/png");
   return relativePath;
 }

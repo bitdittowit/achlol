@@ -27,6 +27,7 @@ export const prankSchema = z.object({
   completionStoryText: z.string().nullable(),
   witnessUserId: z.number().int().positive().nullable(),
   confirmedAt: z.coerce.date().nullable(),
+  witnessRejectedAt: z.coerce.date().nullable().optional(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
   media: z.array(mediaSchema).optional(),
@@ -54,6 +55,7 @@ export const updatePrankBodySchema = z.object({
 export const prankListQuerySchema = z.object({
   status: prankStatusSchema.optional(),
   participantsQuery: z.string().max(100).optional(),
+  confirmedOnly: z.coerce.boolean().optional(),
 });
 
 export type IconType = z.infer<typeof iconTypeSchema>;

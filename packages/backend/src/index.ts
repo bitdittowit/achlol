@@ -3,6 +3,7 @@ import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
 import { authMiddleware } from "./lib/authPlugin.js";
 import { ensureUploadsDir } from "./lib/storage.js";
+import { getStorageAdapter } from "./lib/adapters/index.js";
 import { usersRoutes } from "./routes/users.js";
 import { pranksRoutes } from "./routes/pranks.js";
 import { filesRoutes } from "./routes/files.js";
@@ -27,7 +28,10 @@ await app.register(filesRoutes);
 await app.register(friendsRoutes);
 await app.register(internalRoutes);
 
-await ensureUploadsDir();
+if ((process.env.STORAGE_ADAPTER ?? "local") === "local") {
+  await ensureUploadsDir();
+}
+getStorageAdapter();
 
 const host = process.env.HOST ?? "0.0.0.0";
 const port = Number(process.env.PORT ?? 3000);

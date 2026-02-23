@@ -1,12 +1,14 @@
 import { prisma } from "../lib/db.js";
 import type { CreatePrankBody, UpdatePrankBody, PrankStatus, PrankListQuery } from "@prankster/shared";
 import { generateIconFromTitle } from "./iconService.js";
-import { fullPath, mediaRelativePath, uniqueFilename } from "../lib/storage.js";
+import { mediaRelativePath, uniqueFilename } from "../lib/storage.js";
+import { getStorageAdapter } from "../lib/adapters/index.js";
+import { compressMediaImage } from "../lib/compressMedia.js";
 import { sendMessage, downloadTelegramFile } from "../lib/telegramBot.js";
 import { areFriends, getFriends } from "./friendService.js";
 import { processUploadedIcon } from "./iconService.js";
-import fs from "node:fs/promises";
 
+/** Лимит только на запланированные приколы; архив (completed) не лимитируется. */
 const ACTIVE_PRANKS_LIMIT = 30;
 
 export async function createPrank(
@@ -20,7 +22,7 @@ export async function createPrank(
   });
   if (activeCount >= ACTIVE_PRANKS_LIMIT) {
     throw new Error(
-      "Достигнут лимит активных приколов (30). Отметьте старые как «Случилось» или удалите."
+      "Достигнут лимит запланированных приколов (30). Отметьте старые как «Случилось» или удалите."
     );
   }
 
@@ -83,13 +85,17 @@ export async function createPrank(
 }
 
 export async function listPranks(userId: number, query?: PrankListQuery) {
-  const where: { userId: number; status?: PrankStatus; participants?: { contains: string; mode: "insensitive" } } = {
-    userId,
-  };
+  const where: {
+    userId: number;
+    status?: PrankStatus;
+    participants?: { contains: string; mode: "insensitive" };
+    confirmedAt?: { not: null };
+  } = { userId };
   if (query?.status) where.status = query.status;
   if (query?.participantsQuery?.trim()) {
     where.participants = { contains: query.participantsQuery.trim(), mode: "insensitive" };
   }
+  if (query?.confirmedOnly === true) where.confirmedAt = { not: null };
 
   return prisma.prank.findMany({
     where,
@@ -98,13 +104,13 @@ export async function listPranks(userId: number, query?: PrankListQuery) {
   });
 }
 
-/** Pranks from friends for the feed, newest first. */
+/** Pranks from friends for the feed (only completed), newest first. */
 export async function getFeedPranks(viewerUserId: number, limit = 50) {
   const friends = await getFriends(viewerUserId);
   const friendIds = friends.map((f) => f.id);
   if (friendIds.length === 0) return [];
   const pranks = await prisma.prank.findMany({
-    where: { userId: { in: friendIds } },
+    where: { userId: { in: friendIds }, status: "completed" },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
@@ -129,11 +135,14 @@ export async function getPrankById(prankId: number, userId: number) {
   return prank ?? null;
 }
 
-/** Returns prank if viewer is owner or friend of owner (for read-only view). */
+/** Returns prank if viewer is owner or friend of owner (for read-only view). Includes witness for confirmation flow. */
 export async function getPrankByIdForViewer(prankId: number, viewerUserId: number) {
   const prank = await prisma.prank.findUnique({
     where: { id: prankId },
-    include: { media: true },
+    include: {
+      media: true,
+      witness: { select: { id: true, firstName: true, lastName: true, username: true } },
+    },
   });
   if (!prank) return null;
   if (prank.userId === viewerUserId) return prank;
@@ -151,15 +160,15 @@ export async function createQuickPrankFromBot(
   });
   if (activeCount >= ACTIVE_PRANKS_LIMIT) {
     throw new Error(
-      "Достигнут лимит активных приколов (30). Отметьте старые как «Случилось» или удалите."
+      "Достигнут лимит запланированных приколов (30). Отметьте старые как «Случилось» или удалите."
     );
   }
   const buffer = await downloadTelegramFile(fileId);
-  const ext = ".jpg";
+  const { buffer: compressed, ext } = await compressMediaImage(buffer, "image/jpeg");
   const filename = uniqueFilename(ext);
   const mediaPath = mediaRelativePath(filename);
-  await fs.writeFile(fullPath(mediaPath), buffer);
-  const iconPath = await processUploadedIcon(buffer, "image/jpeg");
+  await getStorageAdapter().upload(mediaPath, compressed, "image/jpeg");
+  const iconPath = await processUploadedIcon(compressed, "image/jpeg");
   const title =
     (caption?.trim() && caption.trim().length > 0)
       ? caption.trim().slice(0, 200)
@@ -197,6 +206,37 @@ export async function confirmPrankByWitness(prankId: number, witnessUserId: numb
     where: { id: prankId },
     data: { confirmedAt: new Date() },
   });
+  return prisma.prank.findUnique({ where: { id: prankId }, include: { media: true } });
+}
+
+/** Idempotent: set witnessRejectedAt and notify author. Returns prank or null. */
+export async function rejectPrankByWitness(prankId: number, witnessUserId: number) {
+  const prank = await prisma.prank.findFirst({
+    where: { id: prankId, witnessUserId },
+    include: { user: true, witness: true },
+  });
+  if (!prank) return null;
+  if (prank.witnessRejectedAt) {
+    return prisma.prank.findUnique({ where: { id: prankId }, include: { media: true } });
+  }
+  await prisma.prank.update({
+    where: { id: prankId },
+    data: { witnessRejectedAt: new Date() },
+  });
+  const witnessName =
+    [prank.witness?.firstName, prank.witness?.lastName].filter(Boolean).join(" ") ||
+    prank.witness?.username ||
+    "Свидетель";
+  const author = await prisma.user.findUnique({
+    where: { id: prank.userId },
+    select: { telegramId: true },
+  });
+  if (author?.telegramId) {
+    await sendMessage(
+      author.telegramId,
+      `${witnessName} не подтвердил прикол «${prank.title}»`
+    );
+  }
   return prisma.prank.findUnique({ where: { id: prankId }, include: { media: true } });
 }
 
@@ -259,17 +299,114 @@ export async function updatePrank(
   return getPrankById(prankId, userId);
 }
 
+/** Mark prank as completed with story text and optional new media (photos compressed, videos stored as-is). */
+export async function completePrank(
+  prankId: number,
+  userId: number,
+  completionStoryText: string | null,
+  photoBuffers: { buffer: Buffer; mimetype: string }[],
+  videoBuffers: { buffer: Buffer; mimetype: string }[]
+) {
+  const existing = await getPrankById(prankId, userId);
+  if (!existing) return null;
+  if (existing.status === "completed") return getPrankById(prankId, userId);
+
+  const existingMedia = await prisma.media.findMany({
+    where: { prankId },
+    orderBy: { sortOrder: "desc" },
+    take: 1,
+  });
+  let sortOrder = existingMedia[0]?.sortOrder ?? -1;
+
+  await prisma.prank.update({
+    where: { id: prankId },
+    data: {
+      status: "completed",
+      completedAt: new Date(),
+      completionStoryText: completionStoryText?.trim() || null,
+    },
+  });
+
+  for (const { buffer, mimetype } of photoBuffers) {
+    sortOrder += 1;
+    const { buffer: compressed, ext } = await compressMediaImage(buffer, mimetype);
+    const filename = uniqueFilename(ext);
+    const mediaPath = mediaRelativePath(filename);
+    const contentType = ext === ".png" ? "image/png" : "image/jpeg";
+    await getStorageAdapter().upload(mediaPath, compressed, contentType);
+    await prisma.media.create({
+      data: { prankId, type: "photo", filePath: mediaPath, sortOrder },
+    });
+  }
+
+  const videoExt = (mime: string) => (mime.includes("mp4") ? ".mp4" : mime.includes("quicktime") || mime.includes("mov") ? ".mov" : ".webm");
+  for (const { buffer, mimetype } of videoBuffers) {
+    sortOrder += 1;
+    const ext = videoExt(mimetype);
+    const filename = uniqueFilename(ext);
+    const mediaPath = mediaRelativePath(filename);
+    await getStorageAdapter().upload(mediaPath, buffer, mimetype);
+    await prisma.media.create({
+      data: { prankId, type: "video", filePath: mediaPath, sortOrder },
+    });
+  }
+
+  const ownerId = existing.userId;
+  const friends = await getFriends(ownerId);
+  const owner = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { firstName: true, lastName: true, username: true },
+  });
+  const ownerName = owner ? [owner.firstName, owner.lastName].filter(Boolean).join(" ") || owner.username || "Друг" : "Друг";
+  const title = existing.title;
+  for (const friend of friends) {
+    const friendUser = await prisma.user.findUnique({
+      where: { id: friend.id },
+      select: { telegramId: true },
+    });
+    if (friendUser?.telegramId) {
+      await sendMessage(
+        friendUser.telegramId,
+        `${ownerName} отметил прикол «${title}» как случившийся! 🎉`
+      );
+    }
+  }
+
+  return getPrankById(prankId, userId);
+}
+
 export async function deletePrankIcon(prankId: number, userId: number): Promise<boolean> {
   const prank = await getPrankById(prankId, userId);
   if (!prank?.iconPath) return false;
-  try {
-    await fs.unlink(fullPath(prank.iconPath));
-  } catch {
-    // ignore
-  }
+  await getStorageAdapter().delete(prank.iconPath);
   await prisma.prank.update({
     where: { id: prankId },
     data: { iconPath: null },
   });
+  return true;
+}
+
+/** Delete prank and all its files from storage (icon + media). Cascade via adapter. */
+export async function deletePrank(prankId: number, userId: number): Promise<boolean> {
+  const prank = await getPrankById(prankId, userId);
+  if (!prank) return false;
+  const adapter = getStorageAdapter();
+  if (prank.iconPath) {
+    try {
+      await adapter.delete(prank.iconPath);
+    } catch {
+      // ignore missing file
+    }
+  }
+  if (prank.media?.length) {
+    for (const m of prank.media) {
+      try {
+        await adapter.delete(m.filePath);
+      } catch {
+        // ignore missing file
+      }
+    }
+  }
+  await prisma.prank.delete({ where: { id: prankId } });
   return true;
 }

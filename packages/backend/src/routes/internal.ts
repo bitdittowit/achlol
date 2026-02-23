@@ -51,6 +51,20 @@ export async function internalRoutes(app: FastifyInstance) {
     return reply.send({ success: true });
   });
 
+  app.post("/api/internal/prank-reject", async (request, reply) => {
+    const body = request.body as { prankId?: number; telegramId?: number };
+    const prankId = Number(body?.prankId);
+    const telegramId = body?.telegramId;
+    if (Number.isNaN(prankId) || typeof telegramId !== "number") {
+      return reply.status(400).send({ error: "Invalid body" });
+    }
+    const user = await prisma.user.findFirst({ where: { telegramId: String(telegramId) } });
+    if (!user) return reply.status(404).send({ error: "User not found" });
+    const prank = await prankService.rejectPrankByWitness(prankId, user.id);
+    if (!prank) return reply.status(404).send({ error: "Not found" });
+    return reply.send({ success: true });
+  });
+
   app.post("/api/internal/pranks/quick", async (request, reply) => {
     const body = request.body as {
       fileId?: string;
