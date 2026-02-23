@@ -1,5 +1,8 @@
 import { Telegraf } from "telegraf";
 import { handleStart } from "./handlers/start.js";
+import { handleFriendRequestCallback } from "./handlers/friendRequest.js";
+import { handlePrankConfirmCallback } from "./handlers/prankConfirm.js";
+import { handlePhoto } from "./handlers/quickPrank.js";
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 if (!token) {
@@ -15,6 +18,9 @@ if (!webAppUrl) {
 const bot = new Telegraf(token);
 
 bot.start(handleStart);
+bot.on("photo", handlePhoto);
+bot.action(/^fr_(accept|reject)_(\d+)$/, handleFriendRequestCallback);
+bot.action(/^prank_(confirm|reject)_(\d+)$/, handlePrankConfirmCallback);
 
 bot.launch().then(async () => {
   if (webAppUrl) {
