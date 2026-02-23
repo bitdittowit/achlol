@@ -10,6 +10,10 @@ export default defineConfig({
   envDir: path.resolve(__dirname, "../.."), // один .env в корне монорепо
   server: {
     port: 5173,
-    allowedHosts: true, // для localtunnel / ngrok и других туннелей
+    allowedHosts: true, // для localtunnel / cloudflared и других туннелей
+    proxy: {
+      // В режиме dev с одним туннелем на 5173 запросы к /api идут на тот же хост и проксируются на бэкенд
+      "/api": { target: "http://localhost:3000", changeOrigin: false },
+    },
   },
 });

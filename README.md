@@ -59,33 +59,26 @@ npm run build -w @prankster/shared
 
 Либо полная сборка всего проекта: `npm run build`.
 
-Запуск всех сервисов:
+**Одна команда (backend + bot + webapp + туннель):**
 
 ```bash
 npm run dev
 ```
 
-Или по отдельности:
+В одном терминале поднимаются: API (порт 3000), Telegram-бот, Mini App (порт 5173) и **один** туннель Cloudflare на 5173. Запросы к `/api` из браузера проксируются с dev-сервера Vite на бэкенд, второй туннель не нужен.
+
+- Нужен **cloudflared**: `brew install cloudflare/cloudflare/cloudflared` (macOS).
+- В выводе найдите URL туннеля вида `https://....trycloudflare.com` (префикс `[tunnel]`). Кнопка «Открыть приложение» в боте обновится на этот URL автоматически (бот читает `.tunnel-url` через 5 и 20 с). Вручную править `MINI_APP_URL` в `.env` при каждом новом запуске не нужно. Если вывод бота не виден в терминале — проверьте файл **`.bot-menu.log`** в корне проекта: там будет записано, какой URL был установлен в кнопку.
+- Для этого режима **не задавайте** `VITE_API_URL` (или оставьте пустым) — API идёт через тот же хост и прокси.
+
+Запуск по отдельности (без туннеля):
 
 - `npm run dev:backend` — API на http://localhost:3000
 - `npm run dev:bot` — Telegram-бот
 - `npm run dev:webapp` — Mini App на http://localhost:5173
+- `npm run dev:tunnel` — туннель на 5173 (для доступа из Telegram)
 
-Для проверки Mini App в Telegram нужен HTTPS. При открытии из Telegram запросы к API идут с телефона, поэтому **бэкенд тоже должен быть доступен по HTTPS** (не localhost).
-
-**Два туннеля (рекомендуется для разработки):**
-
-1. **Туннель для webapp** (порт 5173) — в него заходит пользователь из Telegram.
-   - Пример: `npx localtunnel --port 5173` или `cloudflared tunnel --url http://localhost:5173`.
-   - URL туннеля → в корневой `.env`: `MINI_APP_URL=https://...` и в настройках бота (Menu Button / Web App URL).
-
-2. **Туннель для бэкенда** (порт 3000) — по нему webapp ходит в API.
-   - Пример: `cloudflared tunnel --url http://localhost:3000`.
-   - URL туннеля → в **корневой** `.env`: `VITE_API_URL=https://...` (без слэша в конце).
-
-Без `VITE_API_URL` запросы уходят на тот же хост, что и Mini App (туннель webapp), API там нет → 404 и ошибка «Сервер не найден». Пользователь в БД не создаётся, т.к. бэкенд запрос не получает.
-
-**Локально в браузере (без Telegram):** в корневом `.env` укажите `VITE_API_URL=http://localhost:3000`. Перезапустите webapp после изменения.
+**Локально в браузере (без Telegram):** при запуске только webapp и backend без туннеля укажите в корневом `.env`: `VITE_API_URL=http://localhost:3000`. Перезапустите webapp после изменения.
 
 ## Фазы продукта
 
@@ -99,7 +92,7 @@ npm run dev
 
 | Команда | Описание |
 |--------|----------|
-| `npm run dev` | Запуск backend, bot и webapp |
+| `npm run dev` | Запуск backend, bot, webapp и туннеля (один терминал) |
 | `npm run build` | Сборка shared, backend и webapp |
 | `npm run db:generate` | Генерация Prisma Client |
 | `npm run db:migrate` | Применение миграций |

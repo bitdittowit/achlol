@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": ["packages/*"],
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:bot\" \"npm run dev:webapp\"",
+    "dev": "concurrently -n backend,bot,webapp,tunnel \"npm run dev:backend\" \"npm run dev:bot\" \"npm run dev:webapp\" \"npm run dev:tunnel\"",
+    "dev:tunnel": "bash scripts/tunnel-with-url.sh",
     "dev:backend": "npm run dev -w backend",
     "dev:bot": "npm run dev -w bot",
     "dev:webapp": "npm run dev -w webapp",
