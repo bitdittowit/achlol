@@ -1,9 +1,13 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { initTelegramWebApp } from "./lib/telegram";
-import { ListPage } from "./pages/ListPage.tsx";
-import { CreatePage } from "./pages/CreatePage.tsx";
-import { PrankPage } from "./pages/PrankPage.tsx";
+import { Layout } from "./components/Layout";
+import { ListPage } from "./pages/ListPage";
+import { CreatePage } from "./pages/CreatePage";
+import { PrankPage } from "./pages/PrankPage";
+import { FriendsPage } from "./pages/FriendsPage";
+import { FriendPranksPage } from "./pages/FriendPranksPage";
+import { FeedPage } from "./pages/FeedPage";
 
 export default function App() {
   useEffect(() => {
@@ -12,13 +16,16 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 text-gray-900 p-4 pb-8">
+      <Layout>
         <Routes>
           <Route path="/" element={<ListPage />} />
+          <Route path="/feed" element={<FeedPage />} />
           <Route path="/new" element={<CreatePage />} />
           <Route path="/prank/:id" element={<PrankPage />} />
+          <Route path="/friends" element={<FriendsPage />} />
+          <Route path="/friend/:userId" element={<FriendPranksPage />} />
         </Routes>
-      </div>
+      </Layout>
     </BrowserRouter>
   );
 }

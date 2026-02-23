@@ -17,12 +17,15 @@ export interface Prank {
   description: string | null;
   iconType: IconType;
   iconPath: string | null;
-  fromField: string;
-  toField: string;
+  participants: string;
   status: PrankStatus;
   scheduledAt: string | null;
   completedAt: string | null;
   completionStoryText: string | null;
+  witnessUserId?: number | null;
+  confirmedAt?: string | null;
+  confirmed?: boolean;
+  isOwner?: boolean;
   createdAt: string;
   updatedAt: string;
   media: Media[];

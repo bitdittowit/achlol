@@ -34,6 +34,6 @@ export function AuthImage({ path, alt, className }: AuthImageProps) {
   }, [path]);
 
   if (!path) return null;
-  if (!src) return <div className={className} style={{ background: "#eee", minHeight: 64 }} />;
+  if (!src) return <div className={className} style={{ background: "var(--color-border)", minHeight: 64 }} />;
   return <img src={src} alt={alt} className={className} />;
 }

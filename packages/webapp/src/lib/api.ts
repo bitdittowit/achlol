@@ -63,6 +63,18 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   return parseJsonOrThrow<T>(res);
 }
 
+export async function apiPostNoJson(path: string, body?: unknown): Promise<void> {
+  const res = await fetch(`${base()}${path}`, {
+    method: "POST",
+    headers: headers(),
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error?: string }).error ?? "Request failed");
+  }
+}
+
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${base()}${path}`, {
     method: "PATCH",

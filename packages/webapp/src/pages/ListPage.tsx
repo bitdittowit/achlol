@@ -7,16 +7,33 @@ import type { Prank, PrankStatus } from "../types";
 export function ListPage() {
   const [tab, setTab] = useState<PrankStatus | "all">("planned");
   const [pranks, setPranks] = useState<Prank[]>([]);
+  const [activeCount, setActiveCount] = useState<number | null>(null);
+  const [participantsQuery, setParticipantsQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    const query = tab === "all" ? "" : `?status=${tab}`;
-    apiGet<Prank[]>(`/api/pranks${query}`)
+    const params = new URLSearchParams();
+    if (tab !== "all") params.set("status", tab);
+    if (participantsQuery.trim() && tab === "completed") {
+      params.set("participantsQuery", participantsQuery.trim());
+    }
+    const query = params.toString();
+    apiGet<Prank[]>(`/api/pranks${query ? `?${query}` : ""}`)
       .then(setPranks)
       .catch((e) => setError(e instanceof Error ? e.message : "Ошибка"))
       .finally(() => setLoading(false));
+  }, [tab, participantsQuery]);
+
+  useEffect(() => {
+    if (tab === "planned") {
+      apiGet<{ count: number }>("/api/pranks/active-count")
+        .then((r) => setActiveCount(r.count))
+        .catch(() => setActiveCount(null));
+    } else {
+      setActiveCount(null);
+    }
   }, [tab]);
 
   const formatDate = (s: string | null) => {
@@ -29,52 +46,99 @@ export function ListPage() {
   };
 
   return (
-    <div>
-      <h1 className="text-xl font-bold mb-4">Трекер приколов</h1>
-      <div className="flex gap-2 mb-4">
+    <div className="px-4 pt-2">
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold text-[var(--color-text)]">Альбом</h1>
+        <p className="text-sm text-[var(--color-text-muted)] mt-0.5">Смешные моменты и розыгрыши</p>
+      </div>
+
+      <div className="segment-pill mb-4">
         <button
           type="button"
+          data-active={tab === "planned"}
           onClick={() => setTab("planned")}
-          className={`px-3 py-1.5 rounded-lg ${tab === "planned" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
         >
           Активные
         </button>
         <button
           type="button"
+          data-active={tab === "completed"}
           onClick={() => setTab("completed")}
-          className={`px-3 py-1.5 rounded-lg ${tab === "completed" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
         >
-          Архив
+          Случилось
         </button>
       </div>
+
+      {tab === "planned" && activeCount !== null && (
+        <p className="text-sm text-[var(--color-text-muted)] mb-3">
+          Активных: {activeCount} / 30
+        </p>
+      )}
+      {tab === "completed" && (
+        <div className="mb-4">
+          <input
+            type="search"
+            value={participantsQuery}
+            onChange={(e) => setParticipantsQuery(e.target.value)}
+            placeholder="Найти по участникам…"
+            className="input-field"
+            aria-label="Поиск по участникам"
+          />
+        </div>
+      )}
+
       <Link
         to="/new"
-        className="block w-full py-3 text-center bg-green-600 text-white rounded-xl font-medium mb-6"
+        className="btn-primary mb-6 flex items-center justify-center gap-2"
       >
-        + Новый прикол
+        <span aria-hidden>✨</span>
+        Новый прикол
       </Link>
-      {error && <p className="text-red-600 mb-4">{error}</p>}
-      {loading && <p className="text-gray-500">Загрузка…</p>}
+
+      {error && (
+        <p className="text-[var(--color-error)] mb-4 text-sm" role="alert">
+          {error}
+        </p>
+      )}
+      {loading && (
+        <p className="text-[var(--color-text-muted)] py-8 text-center">Загрузка…</p>
+      )}
       {!loading && !error && pranks.length === 0 && (
-        <p className="text-gray-500">Пока ничего нет</p>
+        <div className="card p-8 text-center">
+          <p className="text-[var(--color-text-muted)]">Пока ничего нет</p>
+          <p className="text-sm text-[var(--color-text-muted)] mt-1">
+            Нажмите «Новый прикол» — займёт пару секунд
+          </p>
+        </div>
       )}
       {!loading && pranks.length > 0 && (
-        <ul className="space-y-3">
+        <ul className="space-y-3" role="list">
           {pranks.map((p) => (
             <li key={p.id}>
               <Link
                 to={`/prank/${p.id}`}
-                className="flex items-center gap-3 p-3 bg-white rounded-xl shadow-sm border border-gray-100"
+                className="card flex items-center gap-4 p-4 active:bg-[var(--color-border)]/30 transition"
               >
-                <div className="w-12 h-12 rounded-full overflow-hidden flex-shrink-0 bg-gray-200">
+                <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-[var(--color-border)]">
                   <AuthImage path={p.iconPath} alt="" className="w-full h-full object-cover" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="font-medium truncate">{p.title}</div>
-                  <div className="text-sm text-gray-500">
-                    {formatDate(p.scheduledAt ?? p.createdAt)} · {p.status === "planned" ? "Запланирован" : "Выполнен"}
+                  <div className="font-medium text-[var(--color-text)] truncate">
+                    {p.title}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-sm text-[var(--color-text-secondary)]">
+                    <span>{formatDate(p.scheduledAt ?? p.createdAt)}</span>
+                    <span>·</span>
+                    <span>{p.status === "planned" ? "Запланирован" : "Случилось"}</span>
+                    {p.confirmed && (
+                      <>
+                        <span>·</span>
+                        <span className="text-[var(--color-accent)]">✓ Подтверждён</span>
+                      </>
+                    )}
                   </div>
                 </div>
+                <span className="text-[var(--color-text-muted)]" aria-hidden>›</span>
               </Link>
             </li>
           ))}
