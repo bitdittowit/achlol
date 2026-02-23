@@ -20,12 +20,13 @@ export const prankSchema = z.object({
   description: z.string().nullable(),
   iconType: iconTypeSchema,
   iconPath: z.string().nullable(),
-  fromField: z.string(),
-  toField: z.string(),
+  participants: z.string(),
   status: prankStatusSchema,
   scheduledAt: z.coerce.date().nullable(),
   completedAt: z.coerce.date().nullable(),
   completionStoryText: z.string().nullable(),
+  witnessUserId: z.number().int().positive().nullable(),
+  confirmedAt: z.coerce.date().nullable(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
   media: z.array(mediaSchema).optional(),
@@ -35,23 +36,24 @@ export const createPrankBodySchema = z.object({
   title: z.string().min(1).max(200),
   description: z.string().max(2000).optional().nullable(),
   iconType: iconTypeSchema.default("auto"),
-  fromField: z.string().min(1).max(200),
-  toField: z.string().min(1).max(200),
+  participants: z.string().min(1).max(500),
   scheduledAt: z.string().datetime().optional().nullable(),
+  witnessUserId: z.number().int().positive().optional().nullable(),
 });
 
 export const updatePrankBodySchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().max(2000).optional().nullable(),
-  fromField: z.string().min(1).max(200).optional(),
-  toField: z.string().min(1).max(200).optional(),
+  participants: z.string().min(1).max(500).optional(),
   status: prankStatusSchema.optional(),
   scheduledAt: z.string().datetime().optional().nullable(),
   completionStoryText: z.string().max(5000).optional().nullable(),
+  witnessUserId: z.number().int().positive().optional().nullable(),
 });
 
 export const prankListQuerySchema = z.object({
   status: prankStatusSchema.optional(),
+  participantsQuery: z.string().max(100).optional(),
 });
 
 export type IconType = z.infer<typeof iconTypeSchema>;

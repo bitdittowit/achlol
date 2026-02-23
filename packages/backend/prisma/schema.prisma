@@ -16,7 +16,12 @@ model User {
   lastName   String?  @map("last_name")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  pranks Prank[]
+  pranks          Prank[]
+  pranksAsWitness Prank[]   @relation("PrankWitness")
+  friendRequestsFrom FriendRequest[] @relation("FromUser")
+  friendRequestsTo   FriendRequest[] @relation("ToUser")
+  friendsAsUser   Friend[]  @relation("UserFriends")
+  friendsAsFriend Friend[]  @relation("FriendWith")
 
   @@map("users")
 }
@@ -28,17 +33,19 @@ model Prank {
   description         String?   @db.Text
   iconType            String    @map("icon_type") // auto | prompt | upload
   iconPath            String?   @map("icon_path")
-  fromField           String    @map("from_field")
-  toField             String   @map("to_field")
+  participants        String   @db.Text
   status              String    // planned | completed
   scheduledAt         DateTime? @map("scheduled_at") @db.Timestamptz
   completedAt         DateTime? @map("completed_at") @db.Timestamptz
   completionStoryText String?   @map("completion_story_text") @db.Text
+  witnessUserId       Int?      @map("witness_user_id")
+  confirmedAt         DateTime? @map("confirmed_at") @db.Timestamptz
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  media Media[]
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  witness  User?  @relation("PrankWitness", fields: [witnessUserId], references: [id], onDelete: SetNull)
+  media    Media[]
 
   @@map("pranks")
 }
@@ -54,4 +61,31 @@ model Media {
   prank Prank @relation(fields: [prankId], references: [id], onDelete: Cascade)
 
   @@map("media")
+}
+
+model FriendRequest {
+  id         Int      @id @default(autoincrement())
+  fromUserId Int      @map("from_user_id")
+  toUserId   Int      @map("to_user_id")
+  status     String   // pending | accepted | rejected
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  fromUser User @relation("FromUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("ToUser", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUserId, toUserId])
+  @@map("friend_requests")
+}
+
+model Friend {
+  id           Int      @id @default(autoincrement())
+  userId       Int      @map("user_id")
+  friendUserId Int      @map("friend_user_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user       User @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friendUser User @relation("FriendWith", fields: [friendUserId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, friendUserId])
+  @@map("friends")
 }
